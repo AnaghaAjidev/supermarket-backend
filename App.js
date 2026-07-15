@@ -1,60 +1,29 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const envPath = path.join(__dirname, ".env");
-
-if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, "utf8");
-
-    envContent.split(/\r?\n/).forEach((line) => {
-        const trimmedLine = line.trim();
-
-        if (!trimmedLine || trimmedLine.startsWith("#")) {
-            return;
-        }
-
-        const separatorIndex = trimmedLine.indexOf("=");
-
-        if (separatorIndex === -1) {
-            return;
-        }
-
-        const key = trimmedLine.slice(0, separatorIndex).trim();
-        let value = trimmedLine.slice(separatorIndex + 1).trim();
-
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-
-        process.env[key] = value;
-    });
-}
-
-const mongoUrl = process.env.MONGO_URL;
-
-if (!mongoUrl) {
-    console.error("MONGO_URL is not set in the .env file");
-    process.exit(1);
-}
-
-mongoose.connect(mongoUrl)
-.then(() => {
-    console.log("MongoDB Connected");
-})
-.catch((error) => {
+// MongoDB Connection
+mongoose
+  .connect(process.env.MONGO_URL)
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+  })
+  .catch((error) => {
     console.log(error);
-});
+  });
 
-const Product = mongoose.model("Products", new mongoose.Schema(
-{
+// ====================== Product Schema ======================
+
+const Product = mongoose.model(
+  "Products",
+  new mongoose.Schema({
     product_id: String,
     product_name: String,
     category: String,
@@ -66,12 +35,15 @@ const Product = mongoose.model("Products", new mongoose.Schema(
     supplier_name: String,
     product_image_url: String,
     stock_status: String,
-    product_description: String
-}
-));
+    product_description: String,
+  })
+);
 
-const Customer = mongoose.model("Customers", new mongoose.Schema(
-{
+// ====================== Customer Schema ======================
+
+const Customer = mongoose.model(
+  "Customers",
+  new mongoose.Schema({
     customer_id: String,
     customer_name: String,
     gender: String,
@@ -83,13 +55,15 @@ const Customer = mongoose.model("Customers", new mongoose.Schema(
     membership_type: String,
     registration_date: String,
     total_purchase_amount: String,
-    loyalty_points: String
-}
-));
+    loyalty_points: String,
+  })
+);
 
+// ====================== Offer Schema ======================
 
-const Offer = mongoose.model("Offers", new mongoose.Schema(
-{
+const Offer = mongoose.model(
+  "Offers",
+  new mongoose.Schema({
     offer_id: String,
     offer_name: String,
     offer_type: String,
@@ -101,205 +75,238 @@ const Offer = mongoose.model("Offers", new mongoose.Schema(
     applicable_products: String,
     coupon_code: String,
     status: String,
-    offer_description: String
-}
-));
+    offer_description: String,
+  })
+);
 
+// ====================== TEST ======================
 
 app.get("/test", (req, res) => {
-    res.send("Supermarket Backend Working");
+  res.send("Supermarket Backend Working");
 });
 
+// ====================== PRODUCT ======================
 
 app.post("/add_product", async (req, res) => {
-
+  try {
     await Product.create(req.body);
 
     res.json({
-        status: "success"
+      status: "success",
+      message: "Product Added",
     });
-
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/view_product", async (req, res) => {
-
+  try {
     const products = await Product.find();
-
     res.json(products);
-
-});
-
-
-app.post("/add_customer", async (req, res) => {
-
-    await Customer.create(req.body);
-
-    res.json({
-        status: "success"
-    });
-
-});
-
-app.post("/view_customer", async (req, res) => {
-
-    const customers = await Customer.find();
-
-    res.json(customers);
-
-});
-
-app.post("/add_offer", async (req, res) => {
-
-    await Offer.create(req.body);
-
-    res.json({
-        status: "success"
-    });
-
-});
-
-app.post("/view_offer", async (req, res) => {
-
-    const offers = await Offer.find();
-
-    res.json(offers);
-
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/delete_product", async (req, res) => {
-
+  try {
     const { product_id } = req.body;
-
-    if (!product_id) {
-        return res.status(400).json({ status: "error", message: "product_id is required" });
-    }
 
     await Product.findOneAndDelete({ product_id });
 
-    res.json({ status: "success" });
-
+    res.json({
+      status: "success",
+      message: "Product Deleted",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/search_product", async (req, res) => {
-
+  try {
     const searchText = req.body.search || "";
 
     const products = await Product.find({
-        $or: [
-            { product_name: { $regex: searchText, $options: "i" } },
-            { category: { $regex: searchText, $options: "i" } },
-            { brand: { $regex: searchText, $options: "i" } }
-        ]
+      $or: [
+        { product_name: { $regex: searchText, $options: "i" } },
+        { category: { $regex: searchText, $options: "i" } },
+        { brand: { $regex: searchText, $options: "i" } },
+      ],
     });
 
     res.json(products);
-
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/update_product", async (req, res) => {
-
+  try {
     const { product_id, ...updateData } = req.body;
 
-    if (!product_id) {
-        return res.status(400).json({ status: "error", message: "product_id is required" });
-    }
+    await Product.findOneAndUpdate({ product_id }, updateData);
 
-    await Product.findOneAndUpdate({ product_id }, updateData, { new: true });
+    res.json({
+      status: "success",
+      message: "Product Updated",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
 
-    res.json({ status: "success" });
+// ====================== CUSTOMER ======================
 
+app.post("/add_customer", async (req, res) => {
+  try {
+    await Customer.create(req.body);
+
+    res.json({
+      status: "success",
+      message: "Customer Added",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+
+app.post("/view_customer", async (req, res) => {
+  try {
+    const customers = await Customer.find();
+
+    res.json(customers);
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/delete_customer", async (req, res) => {
-
+  try {
     const { customer_id } = req.body;
-
-    if (!customer_id) {
-        return res.status(400).json({ status: "error", message: "customer_id is required" });
-    }
 
     await Customer.findOneAndDelete({ customer_id });
 
-    res.json({ status: "success" });
-
+    res.json({
+      status: "success",
+      message: "Customer Deleted",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/search_customer", async (req, res) => {
-
+  try {
     const searchText = req.body.search || "";
 
     const customers = await Customer.find({
-        $or: [
-            { customer_name: { $regex: searchText, $options: "i" } },
-            { email: { $regex: searchText, $options: "i" } },
-            { phone_number: { $regex: searchText, $options: "i" } }
-        ]
+      $or: [
+        { customer_name: { $regex: searchText, $options: "i" } },
+        { email: { $regex: searchText, $options: "i" } },
+        { phone_number: { $regex: searchText, $options: "i" } },
+      ],
     });
 
     res.json(customers);
-
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/update_customer", async (req, res) => {
-
+  try {
     const { customer_id, ...updateData } = req.body;
 
-    if (!customer_id) {
-        return res.status(400).json({ status: "error", message: "customer_id is required" });
-    }
+    await Customer.findOneAndUpdate({ customer_id }, updateData);
 
-    await Customer.findOneAndUpdate({ customer_id }, updateData, { new: true });
+    res.json({
+      status: "success",
+      message: "Customer Updated",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
 
-    res.json({ status: "success" });
+// ====================== OFFER ======================
 
+app.post("/add_offer", async (req, res) => {
+  try {
+    await Offer.create(req.body);
+
+    res.json({
+      status: "success",
+      message: "Offer Added",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+
+app.post("/view_offer", async (req, res) => {
+  try {
+    const offers = await Offer.find();
+
+    res.json(offers);
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/delete_offer", async (req, res) => {
-
+  try {
     const { offer_id } = req.body;
-
-    if (!offer_id) {
-        return res.status(400).json({ status: "error", message: "offer_id is required" });
-    }
 
     await Offer.findOneAndDelete({ offer_id });
 
-    res.json({ status: "success" });
-
+    res.json({
+      status: "success",
+      message: "Offer Deleted",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/search_offer", async (req, res) => {
-
+  try {
     const searchText = req.body.search || "";
 
     const offers = await Offer.find({
-        $or: [
-            { offer_name: { $regex: searchText, $options: "i" } },
-            { offer_type: { $regex: searchText, $options: "i" } },
-            { coupon_code: { $regex: searchText, $options: "i" } }
-        ]
+      $or: [
+        { offer_name: { $regex: searchText, $options: "i" } },
+        { offer_type: { $regex: searchText, $options: "i" } },
+        { coupon_code: { $regex: searchText, $options: "i" } },
+      ],
     });
 
     res.json(offers);
-
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 app.post("/update_offer", async (req, res) => {
-
+  try {
     const { offer_id, ...updateData } = req.body;
 
-    if (!offer_id) {
-        return res.status(400).json({ status: "error", message: "offer_id is required" });
-    }
+    await Offer.findOneAndUpdate({ offer_id }, updateData);
 
-    await Offer.findOneAndUpdate({ offer_id }, updateData, { new: true });
-
-    res.json({ status: "success" });
-
+    res.json({
+      status: "success",
+      message: "Offer Updated",
+    });
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
-app.listen(3000, () => {
+// ====================== SERVER ======================
 
-    console.log("⭐⭐⭐ SUPERMARKET SERVER STARTED ⭐⭐⭐");
+const PORT = process.env.PORT || 3000;
 
+app.listen(PORT, () => {
+  console.log(`⭐⭐⭐ SUPERMARKET SERVER STARTED ON PORT ${PORT} ⭐⭐⭐`);
 });
